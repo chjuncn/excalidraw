@@ -134,6 +134,8 @@ import DebugCanvas, {
 import { AIComponents } from "./components/AI";
 import { ExcalidrawPlusIframeExport } from "./ExcalidrawPlusIframeExport";
 import { AIToolbar } from "./components/AIToolbar";
+import ConflictOverlay from "./components/ConflictOverlay";
+import ConflictsSidebar from "./components/ConflictsSidebar";
 
 import "./index.scss";
 
@@ -386,6 +388,9 @@ const ExcalidrawWrapper = () => {
   });
 
   const [, forceRefresh] = useState(false);
+  const [conflictResults, setConflictResults] = useState<
+    { aId: string; bId: string; reason: string }[]
+  >([]);
 
   useEffect(() => {
     if (isDevEnv()) {
@@ -630,6 +635,10 @@ const ExcalidrawWrapper = () => {
             cd.__inconsistencyMarked = true;
             cd.__originalStrokeColor = el.strokeColor;
           }
+          // avoid changing text color; only update container-like elements
+          if (isTextElement(el)) {
+            return { ...el, customData: cd } as ExcalidrawElement;
+          }
           return { ...el, strokeColor: "#ff3b30", customData: cd } as ExcalidrawElement;
         }
         return el as ExcalidrawElement;
@@ -674,6 +683,7 @@ const ExcalidrawWrapper = () => {
       const MAX_PAIRS = 120;
       let pairCount = 0;
       const toMark = new Set<string>();
+      const results: { aId: string; bId: string; reason: string }[] = [];
       for (let i = 0; i < boxes.length; i++) {
         for (let j = i + 1; j < boxes.length; j++) {
           if (pairCount >= MAX_PAIRS) break;
@@ -693,6 +703,8 @@ const ExcalidrawWrapper = () => {
             if (res.ok && json && json.same_entity && json.inconsistent) {
               toMark.add(left.markId);
               toMark.add(right.markId);
+              const reason = typeof json.reason === "string" ? json.reason : "Inconsistent information";
+              results.push({ aId: left.markId, bId: right.markId, reason });
             }
           } catch (e) {
             // ignore network/model errors for now
@@ -703,6 +715,7 @@ const ExcalidrawWrapper = () => {
       if (toMark.size) {
         markRed(toMark);
       }
+      setConflictResults(results);
       excalidrawAPI.setToast({
         message: toMark.size ? `Inconsistencies found: ${toMark.size / 2} box pairs` : "No inconsistencies found",
       });
@@ -1007,6 +1020,14 @@ const ExcalidrawWrapper = () => {
           }
         }}
       >
+        {/* Conflict overlay */}
+        {excalidrawAPI && conflictResults.length > 0 && (
+          <ConflictOverlay
+            excalidrawAPI={excalidrawAPI}
+            conflicts={conflictResults}
+            onClear={() => setConflictResults([])}
+          />
+        )}
         <AppMainMenu
           onCollabDialogOpen={onCollabDialogOpen}
           isCollaborating={isCollaborating}
@@ -1019,6 +1040,12 @@ const ExcalidrawWrapper = () => {
           onCollabDialogOpen={onCollabDialogOpen}
           isCollabEnabled={!isCollabDisabled}
         />
+        {excalidrawAPI && (
+          <ConflictsSidebar
+            excalidrawAPI={excalidrawAPI}
+            conflicts={conflictResults}
+          />
+        )}
         <OverwriteConfirmDialog>
           <OverwriteConfirmDialog.Actions.ExportToImage />
           <OverwriteConfirmDialog.Actions.SaveToDisk />
