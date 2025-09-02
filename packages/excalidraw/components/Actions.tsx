@@ -19,6 +19,7 @@ import {
   isImageElement,
   isLinearElement,
   isTextElement,
+  isRectangularElement,
 } from "@excalidraw/element";
 
 import { hasStrokeColor, toolIsArrow } from "@excalidraw/element";
@@ -153,6 +154,10 @@ export const SelectedShapeActions = ({
   const showAlignActions =
     !isSingleElementBoundContainer && alignActionsPredicate(appState, app);
 
+  const showAIAction =
+    targetElements.length === 1 &&
+    (isRectangularElement(targetElements[0]) || isTextElement(targetElements[0]));
+
   return (
     <div className="selected-shape-actions">
       <div>
@@ -273,6 +278,22 @@ export const SelectedShapeActions = ({
             {showLinkIcon && renderAction("hyperlink")}
             {showCropEditorAction && renderAction("cropEditor")}
             {showLineEditorAction && renderAction("toggleLinearEditor")}
+            {showAIAction && (
+              <ToolButton
+                type="button"
+                icon={MagicIcon}
+                aria-label="AI Editor"
+                title="AI Editor"
+                onClick={() => {
+                  const element = targetElements[0];
+                  window.dispatchEvent(
+                    new CustomEvent("excalidraw:open-ai", {
+                      detail: { elementId: element.id },
+                    }),
+                  );
+                }}
+              />
+            )}
           </div>
         </fieldset>
       )}

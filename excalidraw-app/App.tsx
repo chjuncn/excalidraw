@@ -46,7 +46,7 @@ import {
   share,
   youtubeIcon,
 } from "@excalidraw/excalidraw/components/icons";
-import { isElementLink } from "@excalidraw/element";
+import { isElementLink, getBoundTextElement, isTextElement } from "@excalidraw/element";
 import { restore, restoreAppState } from "@excalidraw/excalidraw/data/restore";
 import { newElementWith } from "@excalidraw/element";
 import { isInitializedImageElement } from "@excalidraw/element";
@@ -133,10 +133,16 @@ import DebugCanvas, {
 } from "./components/DebugCanvas";
 import { AIComponents } from "./components/AI";
 import { ExcalidrawPlusIframeExport } from "./ExcalidrawPlusIframeExport";
+import { AIToolbar } from "./components/AIToolbar";
 
 import "./index.scss";
 
 import type { CollabAPI } from "./collab/Collab";
+import type {
+  ExcalidrawBindableElement,
+  ExcalidrawElement,
+  ExcalidrawTextElement,
+} from "@excalidraw/element/types";
 
 polyfill();
 
@@ -591,6 +597,121 @@ const ExcalidrawWrapper = () => {
     };
   }, [isCollabDisabled, collabAPI, excalidrawAPI, setLangCode]);
 
+  // Text consistency check: listens for footer button event
+  useEffect(() => {
+    if (!excalidrawAPI) return;
+
+    const clearMarkers = () => {
+      const elements = excalidrawAPI.getSceneElementsIncludingDeleted();
+      let changed = false;
+      const restored = elements.map((el) => {
+        const cd = (el as any).customData || {};
+        if (cd.__inconsistencyMarked) {
+          changed = true;
+          const nextCd = { ...cd };
+          delete nextCd.__inconsistencyMarked;
+          const original = cd.__originalStrokeColor;
+          delete nextCd.__originalStrokeColor;
+          return { ...el, strokeColor: original || el.strokeColor, customData: nextCd } as ExcalidrawElement;
+        }
+        return el as ExcalidrawElement;
+      });
+      if (changed) {
+        excalidrawAPI.updateScene({ elements: restored });
+      }
+    };
+
+    const markRed = (ids: Set<string>) => {
+      const elements = excalidrawAPI.getSceneElementsIncludingDeleted();
+      const updated = elements.map((el) => {
+        if (ids.has(el.id)) {
+          const cd = { ...(el as any).customData };
+          if (!cd.__inconsistencyMarked) {
+            cd.__inconsistencyMarked = true;
+            cd.__originalStrokeColor = el.strokeColor;
+          }
+          return { ...el, strokeColor: "#ff3b30", customData: cd } as ExcalidrawElement;
+        }
+        return el as ExcalidrawElement;
+      });
+      excalidrawAPI.updateScene({ elements: updated });
+    };
+
+    const collectTextBoxes = (): { text: string; textId: string; markId: string }[] => {
+      const out: { text: string; textId: string; markId: string }[] = [];
+      const elements = excalidrawAPI.getSceneElementsIncludingDeleted();
+      const map = new Map(elements.map((e) => [e.id, e]));
+      for (const el of elements) {
+        if (el.isDeleted) continue;
+        if (isTextElement(el)) {
+          const textEl = el as ExcalidrawTextElement;
+          const text = (textEl.text || "").trim();
+          if (!text) continue;
+          const containerId = textEl.containerId;
+          const markId = containerId && map.get(containerId) ? containerId : textEl.id;
+          out.push({ text, textId: textEl.id, markId });
+        }
+      }
+      // dedupe by text+markId to avoid identical duplicates
+      const seen = new Set<string>();
+      return out.filter((i) => {
+        const k = i.text + "|" + i.markId;
+        if (seen.has(k)) return false;
+        seen.add(k);
+        return true;
+      });
+    };
+
+    const handler = async () => {
+      excalidrawAPI.setToast({ message: "Checking text consistency…" });
+      clearMarkers();
+      const boxes = collectTextBoxes();
+      if (boxes.length < 2) {
+        excalidrawAPI.setToast({ message: "Not enough text boxes to compare." });
+        return;
+      }
+
+      const MAX_PAIRS = 120;
+      let pairCount = 0;
+      const toMark = new Set<string>();
+      for (let i = 0; i < boxes.length; i++) {
+        for (let j = i + 1; j < boxes.length; j++) {
+          if (pairCount >= MAX_PAIRS) break;
+          pairCount++;
+          const left = boxes[i];
+          const right = boxes[j];
+          try {
+            const res = await fetch(
+              `${import.meta.env.VITE_APP_AI_BACKEND}/v1/ai/consistency/check`,
+              {
+                method: "POST",
+                headers: { "Content-Type": "application/json", Accept: "application/json" },
+                body: JSON.stringify({ left: left.text, right: right.text }),
+              },
+            );
+            const json = await res.json();
+            if (res.ok && json && json.same_entity && json.inconsistent) {
+              toMark.add(left.markId);
+              toMark.add(right.markId);
+            }
+          } catch (e) {
+            // ignore network/model errors for now
+          }
+        }
+      }
+
+      if (toMark.size) {
+        markRed(toMark);
+      }
+      excalidrawAPI.setToast({
+        message: toMark.size ? `Inconsistencies found: ${toMark.size / 2} box pairs` : "No inconsistencies found",
+      });
+    };
+
+    window.addEventListener("excalidraw:check-consistency", handler as EventListener);
+    return () => window.removeEventListener("excalidraw:check-consistency", handler as EventListener);
+  }, [excalidrawAPI]);
+
   useEffect(() => {
     const unloadHandler = (event: BeforeUnloadEvent) => {
       LocalData.flushSave();
@@ -671,6 +792,28 @@ const ExcalidrawWrapper = () => {
   const [latestShareableLink, setLatestShareableLink] = useState<string | null>(
     null,
   );
+
+  const [aiForElementId, setAiForElementId] = useState<string | null>(
+    null,
+  );
+
+    useEffect(() => {
+    const aiHandler = (e: CustomEvent<{ elementId: string }>) => {
+      setAiForElementId(e.detail.elementId);
+    };
+
+    window.addEventListener(
+      "excalidraw:open-ai",
+      aiHandler as EventListener,
+    );
+
+    return () => {
+      window.removeEventListener(
+        "excalidraw:open-ai",
+        aiHandler as EventListener,
+      );
+    };
+  }, []);
 
   const onExportToBackend = async (
     exportedElements: readonly NonDeletedExcalidrawElement[],
@@ -898,6 +1041,13 @@ const ExcalidrawWrapper = () => {
         </OverwriteConfirmDialog>
         <AppFooter onChange={() => excalidrawAPI?.refresh()} />
         {excalidrawAPI && <AIComponents excalidrawAPI={excalidrawAPI} />}
+        {excalidrawAPI && aiForElementId && (
+          <AIToolbar
+            excalidrawAPI={excalidrawAPI}
+            forceElementId={aiForElementId}
+            onClose={() => setAiForElementId(null)}
+          />
+        )}
 
         <TTDDialogTrigger />
         {isCollaborating && isOffline && (
