@@ -9,6 +9,7 @@ import {
   newTextElement,
   refreshTextDimensions,
 } from "@excalidraw/element";
+
 import type {
   ExcalidrawBindableElement,
   ExcalidrawElement,
@@ -62,17 +63,20 @@ export const AIToolbar = ({
   const selected = useMemo(() => {
     const idFromEvent = forceElementId || null;
     const ids = Object.keys(appState.selectedElementIds || {});
-    const base = (idFromEvent
-      ? elementsMap.get(idFromEvent)
-      : ids.length === 1
-      ? elementsMap.get(ids[0])
-      : null) as ExcalidrawElement | null;
+    const base = (
+      idFromEvent
+        ? elementsMap.get(idFromEvent)
+        : ids.length === 1
+        ? elementsMap.get(ids[0])
+        : null
+    ) as ExcalidrawElement | null;
 
     // Return the element if it's either a rectangle or text element
-    return base && (
-      (isRectangularElement(base) && base.type === "rectangle") ||
-      isTextElement(base)
-    ) ? base : null;
+    return base &&
+      ((isRectangularElement(base) && base.type === "rectangle") ||
+        isTextElement(base))
+      ? base
+      : null;
   }, [forceElementId, appState.selectedElementIds, elementsMap]);
 
   if (!selected) {
@@ -81,7 +85,8 @@ export const AIToolbar = ({
 
   const { x, y } = getToolbarCoords(selected, appState, elementsMap);
   const isTextElement_ = isTextElement(selected);
-  const isRectElement = isRectangularElement(selected) && selected.type === "rectangle";
+  const isRectElement =
+    isRectangularElement(selected) && selected.type === "rectangle";
   const DEFAULT_TEXT_WRAP_WIDTH = 280;
   const LENGTH_WRAP_THRESHOLD = 60;
 
@@ -95,16 +100,18 @@ export const AIToolbar = ({
       let endpoint: string;
       let requestBody: any;
 
-                  if (isTextElement_) {
+      if (isTextElement_) {
         // For text elements, use text editing endpoint
         endpoint = `${import.meta.env.VITE_APP_AI_BACKEND}/v1/ai/text/generate`;
         requestBody = {
           prompt,
-          currentText: (selected as ExcalidrawTextElement).text || ""
+          currentText: (selected as ExcalidrawTextElement).text || "",
         };
       } else {
         // For rectangle elements, use rect-text generation endpoint
-        endpoint = `${import.meta.env.VITE_APP_AI_BACKEND}/v1/ai/rect-text/generate`;
+        endpoint = `${
+          import.meta.env.VITE_APP_AI_BACKEND
+        }/v1/ai/rect-text/generate`;
         requestBody = { prompt };
       }
 
@@ -133,29 +140,42 @@ export const AIToolbar = ({
         ) as unknown as ElementsMap;
 
         const updated = elements.map((el) => {
-          if (el.id !== selected.id) return el;
+          if (el.id !== selected.id) {
+            return el;
+          }
 
           const current = el as ExcalidrawTextElement;
           const container = current.containerId
-            ? (mapNow.get(current.containerId) as ExcalidrawTextContainer | undefined)
+            ? (mapNow.get(current.containerId) as
+                | ExcalidrawTextContainer
+                | undefined)
             : null;
 
-          const shouldWrapStandalone = !container && text.length >= LENGTH_WRAP_THRESHOLD;
+          const shouldWrapStandalone =
+            !container && text.length >= LENGTH_WRAP_THRESHOLD;
 
           const base: ExcalidrawTextElement = {
             ...current,
             text,
             originalText: text,
             autoResize: shouldWrapStandalone ? false : current.autoResize,
-            width: shouldWrapStandalone ? DEFAULT_TEXT_WRAP_WIDTH : current.width,
+            width: shouldWrapStandalone
+              ? DEFAULT_TEXT_WRAP_WIDTH
+              : current.width,
           } as ExcalidrawTextElement;
 
           const dims = refreshTextDimensions(
             base as unknown as ExcalidrawTextElement,
-            (container || null),
+            container || null,
             mapNow,
             text,
-          ) || { text, x: base.x, y: base.y, width: base.width, height: base.height };
+          ) || {
+            text,
+            x: base.x,
+            y: base.y,
+            width: base.width,
+            height: base.height,
+          };
           // lock top-left to the original position for standalone text
           const lockTopLeft = !container;
           return {
@@ -185,15 +205,27 @@ export const AIToolbar = ({
 
         if (bound) {
           const updated = elements.map((el) => {
-            if (el.id !== bound.id) return el;
+            if (el.id !== bound.id) {
+              return el;
+            }
             // bound text wraps to container automatically
-            const base = { ...(el as ExcalidrawTextElement), text, originalText: text } as ExcalidrawTextElement;
+            const base = {
+              ...(el as ExcalidrawTextElement),
+              text,
+              originalText: text,
+            } as ExcalidrawTextElement;
             const dims = refreshTextDimensions(
               base as unknown as ExcalidrawTextElement,
-              (selected as unknown as ExcalidrawTextContainer),
+              selected as unknown as ExcalidrawTextContainer,
               mapNow,
               text,
-            ) || { text, x: base.x, y: base.y, width: base.width, height: base.height };
+            ) || {
+              text,
+              x: base.x,
+              y: base.y,
+              width: base.width,
+              height: base.height,
+            };
             // keep top-left aligned with container top-left padding behavior
             return {
               ...base,
@@ -235,7 +267,13 @@ export const AIToolbar = ({
               null,
               mapNow,
               text,
-            ) || { text, x: provisional.x, y: provisional.y, width: provisional.width, height: provisional.height };
+            ) || {
+              text,
+              x: provisional.x,
+              y: provisional.y,
+              width: provisional.width,
+              height: provisional.height,
+            };
             newText = {
               ...(newText as any),
               text: dims.text,

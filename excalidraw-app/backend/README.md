@@ -30,6 +30,7 @@ uvicorn server:app --host ${HOST:-127.0.0.1} --port ${PORT:-8787}
 ## API
 
 - POST /v1/ai/rect-text/generate
+
   - body: { "prompt": string }
   - returns: { "text": string }
 

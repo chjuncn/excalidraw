@@ -46,7 +46,11 @@ import {
   share,
   youtubeIcon,
 } from "@excalidraw/excalidraw/components/icons";
-import { isElementLink, getBoundTextElement, isTextElement } from "@excalidraw/element";
+import {
+  isElementLink,
+  getBoundTextElement,
+  isTextElement,
+} from "@excalidraw/element";
 import { restore, restoreAppState } from "@excalidraw/excalidraw/data/restore";
 import { newElementWith } from "@excalidraw/element";
 import { isInitializedImageElement } from "@excalidraw/element";
@@ -140,6 +144,7 @@ import ConflictsSidebar from "./components/ConflictsSidebar";
 import "./index.scss";
 
 import type { CollabAPI } from "./collab/Collab";
+
 import type {
   ExcalidrawBindableElement,
   ExcalidrawElement,
@@ -604,7 +609,9 @@ const ExcalidrawWrapper = () => {
 
   // Text consistency check: listens for footer button event
   useEffect(() => {
-    if (!excalidrawAPI) return;
+    if (!excalidrawAPI) {
+      return;
+    }
 
     const clearMarkers = () => {
       const elements = excalidrawAPI.getSceneElementsIncludingDeleted();
@@ -617,7 +624,11 @@ const ExcalidrawWrapper = () => {
           delete nextCd.__inconsistencyMarked;
           const original = cd.__originalStrokeColor;
           delete nextCd.__originalStrokeColor;
-          return { ...el, strokeColor: original || el.strokeColor, customData: nextCd } as ExcalidrawElement;
+          return {
+            ...el,
+            strokeColor: original || el.strokeColor,
+            customData: nextCd,
+          } as ExcalidrawElement;
         }
         return el as ExcalidrawElement;
       });
@@ -639,33 +650,48 @@ const ExcalidrawWrapper = () => {
           if (isTextElement(el)) {
             return { ...el, customData: cd } as ExcalidrawElement;
           }
-          return { ...el, strokeColor: "#ff3b30", customData: cd } as ExcalidrawElement;
+          return {
+            ...el,
+            strokeColor: "#ff3b30",
+            customData: cd,
+          } as ExcalidrawElement;
         }
         return el as ExcalidrawElement;
       });
       excalidrawAPI.updateScene({ elements: updated });
     };
 
-    const collectTextBoxes = (): { text: string; textId: string; markId: string }[] => {
+    const collectTextBoxes = (): {
+      text: string;
+      textId: string;
+      markId: string;
+    }[] => {
       const out: { text: string; textId: string; markId: string }[] = [];
       const elements = excalidrawAPI.getSceneElementsIncludingDeleted();
       const map = new Map(elements.map((e) => [e.id, e]));
       for (const el of elements) {
-        if (el.isDeleted) continue;
+        if (el.isDeleted) {
+          continue;
+        }
         if (isTextElement(el)) {
           const textEl = el as ExcalidrawTextElement;
           const text = (textEl.text || "").trim();
-          if (!text) continue;
+          if (!text) {
+            continue;
+          }
           const containerId = textEl.containerId;
-          const markId = containerId && map.get(containerId) ? containerId : textEl.id;
+          const markId =
+            containerId && map.get(containerId) ? containerId : textEl.id;
           out.push({ text, textId: textEl.id, markId });
         }
       }
       // dedupe by text+markId to avoid identical duplicates
       const seen = new Set<string>();
       return out.filter((i) => {
-        const k = i.text + "|" + i.markId;
-        if (seen.has(k)) return false;
+        const k = `${i.text}|${i.markId}`;
+        if (seen.has(k)) {
+          return false;
+        }
         seen.add(k);
         return true;
       });
@@ -676,7 +702,9 @@ const ExcalidrawWrapper = () => {
       clearMarkers();
       const boxes = collectTextBoxes();
       if (boxes.length < 2) {
-        excalidrawAPI.setToast({ message: "Not enough text boxes to compare." });
+        excalidrawAPI.setToast({
+          message: "Not enough text boxes to compare.",
+        });
         return;
       }
 
@@ -686,7 +714,9 @@ const ExcalidrawWrapper = () => {
       const results: { aId: string; bId: string; reason: string }[] = [];
       for (let i = 0; i < boxes.length; i++) {
         for (let j = i + 1; j < boxes.length; j++) {
-          if (pairCount >= MAX_PAIRS) break;
+          if (pairCount >= MAX_PAIRS) {
+            break;
+          }
           pairCount++;
           const left = boxes[i];
           const right = boxes[j];
@@ -695,7 +725,10 @@ const ExcalidrawWrapper = () => {
               `${import.meta.env.VITE_APP_AI_BACKEND}/v1/ai/consistency/check`,
               {
                 method: "POST",
-                headers: { "Content-Type": "application/json", Accept: "application/json" },
+                headers: {
+                  "Content-Type": "application/json",
+                  Accept: "application/json",
+                },
                 body: JSON.stringify({ left: left.text, right: right.text }),
               },
             );
@@ -703,7 +736,10 @@ const ExcalidrawWrapper = () => {
             if (res.ok && json && json.same_entity && json.inconsistent) {
               toMark.add(left.markId);
               toMark.add(right.markId);
-              const reason = typeof json.reason === "string" ? json.reason : "Inconsistent information";
+              const reason =
+                typeof json.reason === "string"
+                  ? json.reason
+                  : "Inconsistent information";
               results.push({ aId: left.markId, bId: right.markId, reason });
             }
           } catch (e) {
@@ -717,12 +753,21 @@ const ExcalidrawWrapper = () => {
       }
       setConflictResults(results);
       excalidrawAPI.setToast({
-        message: toMark.size ? `Inconsistencies found: ${toMark.size / 2} box pairs` : "No inconsistencies found",
+        message: toMark.size
+          ? `Inconsistencies found: ${toMark.size / 2} box pairs`
+          : "No inconsistencies found",
       });
     };
 
-    window.addEventListener("excalidraw:check-consistency", handler as EventListener);
-    return () => window.removeEventListener("excalidraw:check-consistency", handler as EventListener);
+    window.addEventListener(
+      "excalidraw:check-consistency",
+      handler as EventListener,
+    );
+    return () =>
+      window.removeEventListener(
+        "excalidraw:check-consistency",
+        handler as EventListener,
+      );
   }, [excalidrawAPI]);
 
   useEffect(() => {
@@ -806,19 +851,14 @@ const ExcalidrawWrapper = () => {
     null,
   );
 
-  const [aiForElementId, setAiForElementId] = useState<string | null>(
-    null,
-  );
+  const [aiForElementId, setAiForElementId] = useState<string | null>(null);
 
-    useEffect(() => {
+  useEffect(() => {
     const aiHandler = (e: CustomEvent<{ elementId: string }>) => {
       setAiForElementId(e.detail.elementId);
     };
 
-    window.addEventListener(
-      "excalidraw:open-ai",
-      aiHandler as EventListener,
-    );
+    window.addEventListener("excalidraw:open-ai", aiHandler as EventListener);
 
     return () => {
       window.removeEventListener(

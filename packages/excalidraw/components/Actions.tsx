@@ -156,7 +156,8 @@ export const SelectedShapeActions = ({
 
   const showAIAction =
     targetElements.length === 1 &&
-    (isRectangularElement(targetElements[0]) || isTextElement(targetElements[0]));
+    (isRectangularElement(targetElements[0]) ||
+      isTextElement(targetElements[0]));
 
   return (
     <div className="selected-shape-actions">

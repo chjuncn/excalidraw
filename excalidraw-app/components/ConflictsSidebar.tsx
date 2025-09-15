@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { Sidebar } from "@excalidraw/excalidraw/components/Sidebar/Sidebar";
 import { useUIAppState } from "@excalidraw/excalidraw/context/ui-appState";
+
 import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
 
 export const ConflictsSidebar = ({
@@ -28,7 +29,9 @@ export const ConflictsSidebar = ({
           gap: 8,
         }}
       >
-        {items.length === 0 && <div style={{ fontSize: 12 }}>No conflicts.</div>}
+        {items.length === 0 && (
+          <div style={{ fontSize: 12 }}>No conflicts.</div>
+        )}
         {items.map((c, idx) => (
           <div
             key={idx}
@@ -47,10 +50,9 @@ export const ConflictsSidebar = ({
               <button
                 type="button"
                 onClick={() =>
-                  excalidrawAPI.scrollToContent(
-                    { id: c.aId } as any,
-                    { animate: true },
-                  )
+                  excalidrawAPI.scrollToContent({ id: c.aId } as any, {
+                    animate: true,
+                  })
                 }
                 style={{
                   background: "var(--button-gray-1)",
@@ -66,10 +68,9 @@ export const ConflictsSidebar = ({
               <button
                 type="button"
                 onClick={() =>
-                  excalidrawAPI.scrollToContent(
-                    { id: c.bId } as any,
-                    { animate: true },
-                  )
+                  excalidrawAPI.scrollToContent({ id: c.bId } as any, {
+                    animate: true,
+                  })
                 }
                 style={{
                   background: "var(--button-gray-1)",
@@ -91,5 +92,3 @@ export const ConflictsSidebar = ({
 };
 
 export default ConflictsSidebar;
-
-

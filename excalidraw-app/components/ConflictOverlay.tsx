@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { sceneCoordsToViewportCoords } from "@excalidraw/common";
 import { getElementAbsoluteCoords } from "@excalidraw/element";
+
 import type { ElementsMap } from "@excalidraw/element/types";
 import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
 
@@ -24,8 +25,12 @@ export const ConflictOverlay = ({
   const reasonsById = useMemo(() => {
     const map = new Map<string, string[]>();
     for (const c of conflicts) {
-      if (!map.has(c.aId)) map.set(c.aId, []);
-      if (!map.has(c.bId)) map.set(c.bId, []);
+      if (!map.has(c.aId)) {
+        map.set(c.aId, []);
+      }
+      if (!map.has(c.bId)) {
+        map.set(c.bId, []);
+      }
       map.get(c.aId)!.push(c.reason);
       map.get(c.bId)!.push(c.reason);
     }
@@ -53,7 +58,11 @@ export const ConflictOverlay = ({
         delete nextCd.__inconsistencyMarked;
         const original = cd.__originalStrokeColor;
         delete nextCd.__originalStrokeColor;
-        return { ...el, strokeColor: original || el.strokeColor, customData: nextCd } as any;
+        return {
+          ...el,
+          strokeColor: original || el.strokeColor,
+          customData: nextCd,
+        } as any;
       }
       return el as any;
     });
@@ -64,13 +73,28 @@ export const ConflictOverlay = ({
   };
 
   return (
-    <div style={{ position: "absolute", inset: 0, pointerEvents: "none", zIndex: 1000 }}>
+    <div
+      style={{
+        position: "absolute",
+        inset: 0,
+        pointerEvents: "none",
+        zIndex: 1000,
+      }}
+    >
       {ids.map((id) => {
         const el = (elementsMap as any).get(id);
-        if (!el) return null;
+        if (!el) {
+          return null;
+        }
         const [x1, y1, x2, y2] = getElementAbsoluteCoords(el, elementsMap);
-        const topLeft = sceneCoordsToViewportCoords({ sceneX: x1, sceneY: y1 }, appState);
-        const bottomRight = sceneCoordsToViewportCoords({ sceneX: x2, sceneY: y2 }, appState);
+        const topLeft = sceneCoordsToViewportCoords(
+          { sceneX: x1, sceneY: y1 },
+          appState,
+        );
+        const bottomRight = sceneCoordsToViewportCoords(
+          { sceneX: x2, sceneY: y2 },
+          appState,
+        );
         const left = topLeft.x - appState.offsetLeft;
         const top = topLeft.y - appState.offsetTop;
         const width = bottomRight.x - topLeft.x;
@@ -78,7 +102,10 @@ export const ConflictOverlay = ({
         const reasons = reasonsById.get(id) || [];
 
         return (
-          <div key={id} style={{ position: "absolute", left, top, width, height }}>
+          <div
+            key={id}
+            style={{ position: "absolute", left, top, width, height }}
+          >
             {/* Border highlight (pointer-events none) */}
             <div
               style={{
@@ -131,13 +158,22 @@ export const ConflictOverlay = ({
                 }}
                 role="dialog"
               >
-                <div style={{ fontWeight: 600, marginBottom: 6 }}>Inconsistency</div>
+                <div style={{ fontWeight: 600, marginBottom: 6 }}>
+                  Inconsistency
+                </div>
                 {reasons.map((r, idx) => (
                   <div key={idx} style={{ fontSize: 12, marginBottom: 4 }}>
                     {r}
                   </div>
                 ))}
-                <div style={{ display: "flex", justifyContent: "space-between", gap: 8, marginTop: 6 }}>
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    gap: 8,
+                    marginTop: 6,
+                  }}
+                >
                   <button
                     type="button"
                     onClick={() => jumpTo(id)}
@@ -193,7 +229,9 @@ export const ConflictOverlay = ({
             gap: 8,
           }}
         >
-          <span>{ids.length} conflicted item{ids.length > 1 ? "s" : ""}</span>
+          <span>
+            {ids.length} conflicted item{ids.length > 1 ? "s" : ""}
+          </span>
           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
             <button
               type="button"
@@ -233,7 +271,9 @@ export const ConflictOverlay = ({
             </button>
             <button
               type="button"
-              onClick={() => excalidrawAPI.toggleSidebar({ name: "conflicts", force: true })}
+              onClick={() =>
+                excalidrawAPI.toggleSidebar({ name: "conflicts", force: true })
+              }
               style={{
                 background: "var(--color-primary)",
                 color: "var(--color-primary-contrast)",
@@ -268,5 +308,3 @@ export const ConflictOverlay = ({
 };
 
 export default ConflictOverlay;
-
-
